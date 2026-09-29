@@ -13,7 +13,7 @@ val recipes = listOf(
     Recipe(
         id = 1,
         name = "Піца Салямі",
-        image = R.drawable.pizza,
+        image = R.drawable.pizza_salami,
         category = "Піца",
         difficulty = "Легко",
         time = "30 хв"
@@ -22,7 +22,7 @@ val recipes = listOf(
         id = 2,
         name = "Млинці",
         image = R.drawable.pancakes,
-        category = "Сніданки",
+        category = "Сніданок",
         difficulty = "Легко",
         time = "25 хв"
     ),
@@ -33,5 +33,29 @@ val recipes = listOf(
         category = "Десерт",
         difficulty = "Важко",
         time = "60 хв"
+    ),
+    Recipe(
+        id = 4,
+        name = "Піца 4 сира",
+        image = R.drawable.pizza_4chesse,
+        category = "Піца",
+        difficulty = "Легко",
+        time = "25 хв"
+    ),
+    Recipe(
+        id = 5,
+        name = "Сирники",
+        image = R.drawable.syrniki,
+        category = "Десерт",
+        difficulty = "Важко",
+        time = "40 хв"
+    ),
+    Recipe(
+        id = 6,
+        name = "Яєчня",
+        image = R.drawable.eggs,
+        category = "Сніданок",
+        difficulty = "Легко",
+        time = "10 хв"
     )
 )
