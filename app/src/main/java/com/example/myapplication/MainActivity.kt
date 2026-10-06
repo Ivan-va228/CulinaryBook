@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -33,9 +33,13 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    viewModel: MainScreenViewModel = viewModel()
+) {
 
-    var category by remember { mutableStateOf("Усі") }
+    val state by viewModel.state.collectAsState()
+
+    val category = state.category
 
     val categories = listOf(
         "Усі",
@@ -67,28 +71,19 @@ fun MainScreen() {
             CategoryRow(
                 categories = categories,
                 selectedCategory = category,
-                onCategorySelected = { category = it }
+                onCategorySelected = {
+                    viewModel.selectCategory(it)
+                }
             )
 
-            if (filteredRecipes.isEmpty()) {
-
-                Text(
-                    "Рецептів у цій категорії немає",
-                    modifier = Modifier.padding(16.dp)
-                )
-
-            } else {
-
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-
-                    items(filteredRecipes) { recipe ->
-                        RecipeCard(recipe)
-                        Spacer(Modifier.height(16.dp))
-                    }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                items(filteredRecipes) { recipe ->
+                    RecipeCard(recipe)
+                    Spacer(Modifier.height(16.dp))
                 }
             }
         }
@@ -105,6 +100,7 @@ fun CategoryRow(
         modifier = Modifier.padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
+
         categories.forEach { category ->
 
             Button(
@@ -126,6 +122,7 @@ fun RecipeCard(recipe: Recipe) {
         Column(Modifier.padding(12.dp)) {
 
             Box {
+
                 Image(
                     painterResource(recipe.image),
                     recipe.name,
@@ -155,6 +152,7 @@ fun RecipeCard(recipe: Recipe) {
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+
                 Text("Складність: ${recipe.difficulty}")
                 Text("Час: ${recipe.time}")
             }
