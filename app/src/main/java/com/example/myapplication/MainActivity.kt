@@ -16,6 +16,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.clickable
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 
 class MainActivity : ComponentActivity() {
 
@@ -25,7 +31,43 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme {
-                MainScreen()
+                val navController = rememberNavController()
+
+                NavHost(
+                    navController = navController,
+                    startDestination = "main"
+                ) {
+                    composable("main") {
+                        MainScreen(
+                            onItemClick = { recipeId ->
+                                navController.navigate("details/$recipeId")
+                            }
+                        )
+                    }
+
+                    composable(
+                        route = "details/{recipeId}",
+                        arguments = listOf(
+                            navArgument("recipeId") {
+                                type = NavType.IntType
+                            }
+                        )
+                    ) { backStackEntry ->
+                        val recipeId =
+                            backStackEntry.arguments?.getInt("recipeId")
+
+                        val recipe = recipes.find {
+                            it.id == recipeId
+                        }
+
+                        RecipeDetailsScreen(
+                            recipe = recipe,
+                            onBackClick = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -34,6 +76,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
+    onItemClick: (Int) -> Unit,
     viewModel: MainScreenViewModel = viewModel()
 ) {
 
@@ -82,7 +125,10 @@ fun MainScreen(
                     .padding(16.dp)
             ) {
                 items(filteredRecipes) { recipe ->
-                    RecipeCard(recipe)
+                    RecipeCard(
+                        recipe = recipe,
+                        onClick = { onItemClick(recipe.id) }
+                    )
                     Spacer(Modifier.height(16.dp))
                 }
             }
@@ -115,9 +161,16 @@ fun CategoryRow(
 }
 
 @Composable
-fun RecipeCard(recipe: Recipe) {
+fun RecipeCard(
+    recipe: Recipe,
+    onClick: () -> Unit
+) {
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
 
         Column(Modifier.padding(12.dp)) {
 
