@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
             val coroutineScope = rememberCoroutineScope()
 
             MyApplicationTheme(darkTheme = darkTheme) {
+                val mealViewModel: MealViewModel = viewModel()
                 val navController = rememberNavController()
 
                 NavHost(
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
                     composable("main") {
                         MainScreen(
                             sortByTime = sortByTime,
+                            mealViewModel = mealViewModel,
                             onSettingsClick = {
                                 navController.navigate("settings")
                             },
@@ -91,15 +93,37 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     ) { backStackEntry ->
-                        val recipeId =
-                            backStackEntry.arguments?.getInt("recipeId")
 
-                        val recipe = recipes.find {
-                            it.id == recipeId
+                        val recipeId = backStackEntry.arguments
+                            ?.getInt("recipeId")
+
+                        var recipe by remember(recipeId) {
+                            mutableStateOf(
+                                mealViewModel.recipes.find {
+                                    it.id == recipeId
+                                }
+                            )
+                        }
+
+                        var isLoadingDetails by remember(recipeId) {
+                            mutableStateOf(true)
+                        }
+
+                        LaunchedEffect(recipeId) {
+                            if (recipeId != null) {
+                                mealViewModel.loadRecipeDetails(recipeId) {
+                                        loadedRecipe ->
+                                    recipe = loadedRecipe
+                                    isLoadingDetails = false
+                                }
+                            } else {
+                                isLoadingDetails = false
+                            }
                         }
 
                         RecipeDetailsScreen(
                             recipe = recipe,
+                            isLoading = isLoadingDetails,
                             onBackClick = {
                                 navController.popBackStack()
                             }
@@ -117,10 +141,15 @@ fun MainScreen(
     onItemClick: (Int) -> Unit,
     sortByTime: Boolean,
     onSettingsClick: () -> Unit,
+    mealViewModel: MealViewModel,
     viewModel: MainScreenViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val category = state.category
+
+    LaunchedEffect(category) {
+        mealViewModel.loadRecipes(category)
+    }
 
     val categories = listOf(
         "Усі",
@@ -129,11 +158,7 @@ fun MainScreen(
         "Сніданок"
     )
 
-    val filteredRecipes = if (category == "Усі") {
-        recipes
-    } else {
-        recipes.filter { it.category == category }
-    }
+    val filteredRecipes = mealViewModel.recipes
 
     val displayedRecipes = if (sortByTime) {
         filteredRecipes.sortedBy {
@@ -146,7 +171,9 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Кулінарна книга") },
+                title = {
+                    Text("Кулінарна книга")
+                },
                 actions = {
                     TextButton(onClick = onSettingsClick) {
                         Text("Налаштування")
@@ -167,6 +194,14 @@ fun MainScreen(
                     viewModel.selectCategory(it)
                 }
             )
+
+            if (mealViewModel.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(
+                        Alignment.CenterHorizontally
+                    )
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier
@@ -218,7 +253,9 @@ fun RecipeCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable {
+                onClick()
+            }
     ) {
         Column(Modifier.padding(12.dp)) {
             Box {
