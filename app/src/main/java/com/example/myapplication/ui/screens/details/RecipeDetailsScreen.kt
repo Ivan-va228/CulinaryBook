@@ -1,5 +1,4 @@
-
-package com.example.myapplication
+package com.example.myapplication.ui.screens.details
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -12,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.example.myapplication.data.model.Recipe
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeDetailsScreen(
@@ -40,7 +39,6 @@ fun RecipeDetailsScreen(
             )
         }
     ) { padding ->
-
         when {
             isLoading -> {
                 Box(

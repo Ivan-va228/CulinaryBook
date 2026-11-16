@@ -1,5 +1,7 @@
 
-package com.example.myapplication
+package com.example.myapplication.data.model
+
+import com.example.myapplication.R
 
 data class Recipe(
     val id: Int,

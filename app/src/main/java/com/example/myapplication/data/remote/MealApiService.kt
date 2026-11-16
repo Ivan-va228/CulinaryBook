@@ -1,5 +1,4 @@
-
-package com.example.myapplication
+package com.example.myapplication.data.remote
 
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType

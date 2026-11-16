@@ -1,5 +1,5 @@
 
-package com.example.myapplication
+package com.example.myapplication.ui.screens.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

@@ -1,5 +1,5 @@
 
-package com.example.myapplication
+package com.example.myapplication.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
+import com.example.myapplication.data.model.Recipe
+import com.example.myapplication.data.mapper.toRecipe
+import com.example.myapplication.data.remote.MealApiService
 
 class MealViewModel : ViewModel() {
 

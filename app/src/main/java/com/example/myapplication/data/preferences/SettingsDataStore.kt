@@ -1,5 +1,4 @@
-
-package com.example.myapplication
+package com.example.myapplication.data.preferences
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey

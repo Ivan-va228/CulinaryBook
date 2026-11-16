@@ -1,5 +1,8 @@
+package com.example.myapplication.data.mapper
 
-package com.example.myapplication
+import com.example.myapplication.R
+import com.example.myapplication.data.model.Recipe
+import com.example.myapplication.data.model.MealResponse
 
 fun MealResponse.toRecipe(): Recipe {
     val ingredients = listOf(
