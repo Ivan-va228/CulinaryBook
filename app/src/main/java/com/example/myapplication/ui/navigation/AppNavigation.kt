@@ -1,3 +1,4 @@
+
 package com.example.myapplication.ui.navigation
 
 import androidx.compose.runtime.*
@@ -16,6 +17,7 @@ import com.example.myapplication.ui.screens.main.MainScreen
 import com.example.myapplication.ui.screens.details.RecipeDetailsScreen
 import com.example.myapplication.ui.screens.settings.SettingsScreen
 import com.example.myapplication.ui.viewmodel.MealViewModel
+import com.example.myapplication.notifications.DailyReminderScheduler
 
 @Composable
 fun AppNavigation() {
@@ -29,6 +31,9 @@ fun AppNavigation() {
     val darkTheme by settingsDataStore.darkTheme
         .collectAsState(initial = false)
 
+    val dailyReminder by settingsDataStore.dailyReminder
+        .collectAsState(initial = false)
+
     val coroutineScope = rememberCoroutineScope()
 
     MyApplicationTheme(darkTheme = darkTheme) {
@@ -40,6 +45,7 @@ fun AppNavigation() {
             navController = navController,
             startDestination = "main"
         ) {
+
             composable("main") {
                 MainScreen(
                     mealViewModel = mealViewModel,
@@ -58,6 +64,18 @@ fun AppNavigation() {
                     onDarkThemeChange = { value ->
                         coroutineScope.launch {
                             settingsDataStore.saveDarkTheme(value)
+                        }
+                    },
+                    dailyReminder = dailyReminder,
+                    onDailyReminderChange = { value ->
+                        coroutineScope.launch {
+                            settingsDataStore.saveDailyReminder(value)
+
+                            if (value) {
+                                DailyReminderScheduler.schedule(context)
+                            } else {
+                                DailyReminderScheduler.cancel(context)
+                            }
                         }
                     },
                     onBackClick = {

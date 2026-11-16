@@ -10,6 +10,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.SerializationException
+import java.io.IOException
+import retrofit2.HttpException
 import com.example.myapplication.data.model.Recipe
 import com.example.myapplication.data.mapper.toRecipe
 import com.example.myapplication.data.remote.MealApiService
@@ -31,19 +35,49 @@ class MealViewModel : ViewModel() {
     var hasMore by mutableStateOf(true)
         private set
 
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
+
     private var mealIds = emptyList<String>()
     private var nextIndex = 0
     private var requestNumber = 0
 
+    private fun getErrorMessage(e: Exception): String {
+        return when (e) {
+            is IOException -> "No internet connection. Check your network."
+            is HttpException -> "Server error. Please try again later."
+            is SerializationException -> "Invalid server response. Please try again."
+            else -> "Something went wrong. Please try again."
+        }
+    }
+
+    fun retry(category: String) {
+        if (categories.isEmpty()) {
+            loadCategories()
+        } else {
+            loadRecipes(category)
+        }
+    }
+
     fun loadCategories() {
         viewModelScope.launch {
+            errorMessage = null
+
             try {
                 val response = MealApiService.api.getCategories()
-
-                categories = response.categories.orEmpty()
+                val result = response.categories.orEmpty()
                     .mapNotNull { it.name }
+
+                if (result.isEmpty()) {
+                    throw SerializationException("Invalid categories response")
+                }
+
+                categories = result
+
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                e.printStackTrace()
+                errorMessage = getErrorMessage(e)
             }
         }
     }
@@ -54,6 +88,7 @@ class MealViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             isLoadingMore = false
+            errorMessage = null
             recipes = emptyList()
             mealIds = emptyList()
             nextIndex = 0
@@ -63,14 +98,25 @@ class MealViewModel : ViewModel() {
                 val response =
                     MealApiService.api.getMealsByCategory(category)
 
-                mealIds = response.meals.orEmpty()
-                    .mapNotNull { it.id }
+                val meals = response.meals.orEmpty()
 
-                loadNextBatch(currentRequest)
+                if (meals.any { it.id.isNullOrBlank() }) {
+                    throw SerializationException("Invalid meal data")
+                }
 
+                mealIds = meals.map { it.id!! }
+
+                if (mealIds.isNotEmpty()) {
+                    loadNextBatch(currentRequest)
+                } else {
+                    hasMore = false
+                }
+
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                e.printStackTrace()
                 if (currentRequest == requestNumber) {
+                    errorMessage = getErrorMessage(e)
                     recipes = emptyList()
                 }
             } finally {
@@ -91,8 +137,12 @@ class MealViewModel : ViewModel() {
 
             try {
                 loadNextBatch(currentRequest)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                e.printStackTrace()
+                if (currentRequest == requestNumber) {
+                    errorMessage = getErrorMessage(e)
+                }
             } finally {
                 if (currentRequest == requestNumber) {
                     isLoadingMore = false
@@ -114,18 +164,15 @@ class MealViewModel : ViewModel() {
         val newRecipes = coroutineScope {
             batchIds.map { id ->
                 async {
-                    try {
-                        MealApiService.api.getMealById(id)
-                            .meals
-                            ?.firstOrNull()
-                            ?.toRecipe()
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        null
-                    }
+                    val response = MealApiService.api.getMealById(id)
+
+                    val meal = response.meals?.firstOrNull()
+                        ?: throw SerializationException("Invalid meal response")
+
+                    meal.toRecipe()
                 }
             }.awaitAll()
-        }.filterNotNull()
+        }
 
         if (currentRequest == requestNumber) {
             recipes = recipes + newRecipes
@@ -144,11 +191,14 @@ class MealViewModel : ViewModel() {
                     MealApiService.api.getMealById(id.toString())
 
                 val meal = response.meals?.firstOrNull()
+                    ?: throw SerializationException("Invalid meal response")
 
-                onResult(meal?.toRecipe())
+                onResult(meal.toRecipe())
 
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                e.printStackTrace()
+                errorMessage = getErrorMessage(e)
                 onResult(null)
             }
         }

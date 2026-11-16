@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.viewmodel
 
 data class MainScreenState(
-    val category: String = "Усі"
+    val category: String = "Усі",
+    val error: String? = null
 )

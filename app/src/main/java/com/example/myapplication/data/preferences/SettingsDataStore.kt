@@ -1,3 +1,4 @@
+
 package com.example.myapplication.data.preferences
 
 import android.content.Context
@@ -12,6 +13,7 @@ private val Context.dataStore by preferencesDataStore(
 )
 
 private val DARK_THEME = booleanPreferencesKey("dark_theme")
+private val DAILY_REMINDER = booleanPreferencesKey("daily_reminder")
 
 class SettingsDataStore(private val context: Context) {
 
@@ -20,9 +22,20 @@ class SettingsDataStore(private val context: Context) {
             preferences[DARK_THEME] ?: false
         }
 
+    val dailyReminder: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[DAILY_REMINDER] ?: false
+        }
+
     suspend fun saveDarkTheme(value: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[DARK_THEME] = value
+        }
+    }
+
+    suspend fun saveDailyReminder(value: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DAILY_REMINDER] = value
         }
     }
 }

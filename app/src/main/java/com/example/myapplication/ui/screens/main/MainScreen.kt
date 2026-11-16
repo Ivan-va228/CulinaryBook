@@ -32,6 +32,7 @@ fun MainScreen(
     val displayedRecipes = mealViewModel.recipes.sortedBy { it.name }
 
     val listState = rememberLazyListState()
+
     LaunchedEffect(category) {
         listState.scrollToItem(0)
     }
@@ -100,40 +101,89 @@ fun MainScreen(
                 }
             )
 
-            if (mealViewModel.isLoading && displayedRecipes.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    items(displayedRecipes) { recipe ->
-                        RecipeCard(
-                            recipe = recipe,
-                            onClick = {
-                                onItemClick(recipe.id)
-                            }
-                        )
+            when {
+                mealViewModel.errorMessage != null -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = mealViewModel.errorMessage!!
+                            )
 
-                        Spacer(Modifier.height(16.dp))
-                    }
+                            Spacer(Modifier.height(16.dp))
 
-                    if (mealViewModel.isLoadingMore) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
+                            Button(
+                                onClick = {
+                                    mealViewModel.retry(category)
+                                }
                             ) {
-                                CircularProgressIndicator()
+                                Text("Try again")
+                            }
+                        }
+                    }
+                }
+
+                mealViewModel.isLoading && displayedRecipes.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                categories.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                displayedRecipes.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No recipes found in this category.")
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
+                        items(displayedRecipes) { recipe ->
+                            RecipeCard(
+                                recipe = recipe,
+                                onClick = {
+                                    onItemClick(recipe.id)
+                                }
+                            )
+
+                            Spacer(Modifier.height(16.dp))
+                        }
+
+                        if (mealViewModel.isLoadingMore) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator()
+                                }
                             }
                         }
                     }
