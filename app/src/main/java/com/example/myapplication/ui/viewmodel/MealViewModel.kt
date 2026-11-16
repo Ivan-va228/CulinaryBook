@@ -7,11 +7,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import com.example.myapplication.data.model.Recipe
 import com.example.myapplication.data.mapper.toRecipe
 import com.example.myapplication.data.remote.MealApiService
 
 class MealViewModel : ViewModel() {
+
+    var categories by mutableStateOf<List<String>>(emptyList())
+        private set
 
     var recipes by mutableStateOf<List<Recipe>>(emptyList())
         private set
@@ -19,39 +25,51 @@ class MealViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
         private set
 
+    var isLoadingMore by mutableStateOf(false)
+        private set
+
+    var hasMore by mutableStateOf(true)
+        private set
+
+    private var mealIds = emptyList<String>()
+    private var nextIndex = 0
     private var requestNumber = 0
 
-    fun loadRecipes(category: String = "Усі") {
+    fun loadCategories() {
+        viewModelScope.launch {
+            try {
+                val response = MealApiService.api.getCategories()
+
+                categories = response.categories.orEmpty()
+                    .mapNotNull { it.name }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun loadRecipes(category: String) {
         val currentRequest = ++requestNumber
 
         viewModelScope.launch {
             isLoading = true
+            isLoadingMore = false
+            recipes = emptyList()
+            mealIds = emptyList()
+            nextIndex = 0
+            hasMore = true
 
             try {
-                val response = when (category) {
-                    "Десерт" ->
-                        MealApiService.api.getMealsByCategory("Dessert")
+                val response =
+                    MealApiService.api.getMealsByCategory(category)
 
-                    "Сніданок" ->
-                        MealApiService.api.getMealsByCategory("Breakfast")
+                mealIds = response.meals.orEmpty()
+                    .mapNotNull { it.id }
 
-                    "Піца" ->
-                        MealApiService.api.searchMeals("pizza")
-
-                    else ->
-                        MealApiService.api.searchMeals("chicken")
-                }
-
-                val newRecipes = response.meals.orEmpty()
-                    .map { it.toRecipe() }
-
-                if (currentRequest == requestNumber) {
-                    recipes = newRecipes
-                }
+                loadNextBatch(currentRequest)
 
             } catch (e: Exception) {
                 e.printStackTrace()
-
                 if (currentRequest == requestNumber) {
                     recipes = emptyList()
                 }
@@ -60,6 +78,59 @@ class MealViewModel : ViewModel() {
                     isLoading = false
                 }
             }
+        }
+    }
+
+    fun loadNextPage() {
+        if (isLoading || isLoadingMore || !hasMore) return
+
+        val currentRequest = requestNumber
+
+        viewModelScope.launch {
+            isLoadingMore = true
+
+            try {
+                loadNextBatch(currentRequest)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                if (currentRequest == requestNumber) {
+                    isLoadingMore = false
+                }
+            }
+        }
+    }
+
+    private suspend fun loadNextBatch(currentRequest: Int) {
+        val batchIds = mealIds
+            .drop(nextIndex)
+            .take(10)
+
+        if (batchIds.isEmpty()) {
+            hasMore = false
+            return
+        }
+
+        val newRecipes = coroutineScope {
+            batchIds.map { id ->
+                async {
+                    try {
+                        MealApiService.api.getMealById(id)
+                            .meals
+                            ?.firstOrNull()
+                            ?.toRecipe()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+            }.awaitAll()
+        }.filterNotNull()
+
+        if (currentRequest == requestNumber) {
+            recipes = recipes + newRecipes
+            nextIndex += batchIds.size
+            hasMore = nextIndex < mealIds.size
         }
     }
 

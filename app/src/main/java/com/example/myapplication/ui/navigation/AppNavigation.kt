@@ -1,4 +1,3 @@
-
 package com.example.myapplication.ui.navigation
 
 import androidx.compose.runtime.*
@@ -27,9 +26,6 @@ fun AppNavigation() {
         SettingsDataStore(context)
     }
 
-    val sortByTime by settingsDataStore.sortByTime
-        .collectAsState(initial = false)
-
     val darkTheme by settingsDataStore.darkTheme
         .collectAsState(initial = false)
 
@@ -46,7 +42,6 @@ fun AppNavigation() {
         ) {
             composable("main") {
                 MainScreen(
-                    sortByTime = sortByTime,
                     mealViewModel = mealViewModel,
                     onSettingsClick = {
                         navController.navigate("settings")
@@ -59,12 +54,6 @@ fun AppNavigation() {
 
             composable("settings") {
                 SettingsScreen(
-                    sortByTime = sortByTime,
-                    onSortByTimeChange = { value ->
-                        coroutineScope.launch {
-                            settingsDataStore.saveSortByTime(value)
-                        }
-                    },
                     darkTheme = darkTheme,
                     onDarkThemeChange = { value ->
                         coroutineScope.launch {

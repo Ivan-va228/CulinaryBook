@@ -1,6 +1,6 @@
+
 package com.example.myapplication.ui.screens.details
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,10 +8,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.myapplication.data.model.Recipe
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeDetailsScreen(
@@ -23,7 +24,7 @@ fun RecipeDetailsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(recipe?.name ?: "Рецепт")
+                    Text(recipe?.name ?: "Recipe")
                 },
                 navigationIcon = {
                     IconButton(
@@ -39,6 +40,7 @@ fun RecipeDetailsScreen(
             )
         }
     ) { padding ->
+
         when {
             isLoading -> {
                 Box(
@@ -53,7 +55,7 @@ fun RecipeDetailsScreen(
 
             recipe == null -> {
                 Text(
-                    text = "Не вдалося завантажити рецепт",
+                    text = "Failed to load recipe",
                     modifier = Modifier
                         .padding(padding)
                         .padding(16.dp)
@@ -68,8 +70,8 @@ fun RecipeDetailsScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
-                    Image(
-                        painter = painterResource(recipe.image),
+                    AsyncImage(
+                        model = recipe.imageUrl,
                         contentDescription = recipe.name,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -83,35 +85,55 @@ fun RecipeDetailsScreen(
                         fontSize = 26.sp
                     )
 
-                    Text("Категорія: ${recipe.category}")
-                    Text("Складність: ${recipe.difficulty}")
-                    Text("Час приготування: ${recipe.time}")
+                    Spacer(Modifier.height(8.dp))
+
+                    Text("Category: ${recipe.category}")
+                    Text("Cuisine: ${recipe.area}")
+
+                    if (recipe.tags.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Tags: ${recipe.tags}")
+                    }
 
                     Spacer(Modifier.height(16.dp))
 
                     Text(
-                        "Інгредієнти",
+                        "Ingredients",
                         fontSize = 20.sp
                     )
 
+                    Spacer(Modifier.height(8.dp))
+
                     Text(
-                        text = recipe.ingredients.ifBlank {
-                            "Інгредієнти відсутні"
+                        recipe.ingredients.ifBlank {
+                            "No ingredients available"
                         }
                     )
 
                     Spacer(Modifier.height(16.dp))
 
                     Text(
-                        "Спосіб приготування",
+                        "Instructions",
                         fontSize = 20.sp
                     )
 
+                    Spacer(Modifier.height(8.dp))
+
                     Text(
-                        text = recipe.instructions.ifBlank {
-                            "Інструкція відсутня"
+                        recipe.instructions.ifBlank {
+                            "No instructions available"
                         }
                     )
+
+                    if (recipe.youtube.isNotBlank()) {
+                        Spacer(Modifier.height(16.dp))
+                        Text("Video: ${recipe.youtube}")
+                    }
+
+                    if (recipe.source.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Source: ${recipe.source}")
+                    }
                 }
             }
         }

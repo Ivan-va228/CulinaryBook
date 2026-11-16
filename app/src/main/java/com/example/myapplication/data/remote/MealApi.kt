@@ -3,6 +3,7 @@ package com.example.myapplication.data.remote
 import retrofit2.http.GET
 import retrofit2.http.Query
 import com.example.myapplication.data.model.MealListResponse
+import com.example.myapplication.data.model.MealCategoryResponse
 
 interface MealApi {
 
@@ -21,6 +22,6 @@ interface MealApi {
         @Query("i") id: String
     ): MealListResponse
 
-    @GET("list.php?c=list")
-    suspend fun getCategories(): MealListResponse
+    @GET("categories.php")
+    suspend fun getCategories(): MealCategoryResponse
 }

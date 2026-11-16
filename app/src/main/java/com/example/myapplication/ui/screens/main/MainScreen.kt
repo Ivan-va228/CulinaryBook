@@ -1,25 +1,26 @@
+
 package com.example.myapplication.ui.screens.main
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.snapshotFlow
 import com.example.myapplication.ui.components.CategoryRow
 import com.example.myapplication.ui.components.RecipeCard
 import com.example.myapplication.ui.viewmodel.MealViewModel
 import com.example.myapplication.ui.viewmodel.MainScreenViewModel
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     onItemClick: (Int) -> Unit,
-    sortByTime: Boolean,
     onSettingsClick: () -> Unit,
     mealViewModel: MealViewModel,
     viewModel: MainScreenViewModel = viewModel()
@@ -27,46 +28,70 @@ fun MainScreen(
     val state by viewModel.state.collectAsState()
     val category = state.category
 
+    val categories = mealViewModel.categories
+    val displayedRecipes = mealViewModel.recipes.sortedBy { it.name }
+
+    val listState = rememberLazyListState()
     LaunchedEffect(category) {
-        mealViewModel.loadRecipes(category)
+        listState.scrollToItem(0)
     }
 
-    val categories = listOf(
-        "Усі",
-        "Піца",
-        "Десерт",
-        "Сніданок"
-    )
+    LaunchedEffect(Unit) {
+        mealViewModel.loadCategories()
+    }
 
-    val filteredRecipes = mealViewModel.recipes
-
-    val displayedRecipes = if (sortByTime) {
-        filteredRecipes.sortedBy {
-            it.time.substringBefore(" ").toIntOrNull() ?: 0
+    LaunchedEffect(categories) {
+        if (categories.isNotEmpty() && category !in categories) {
+            viewModel.selectCategory(categories.first())
         }
-    } else {
-        filteredRecipes.sortedBy { it.name }
+    }
+
+    LaunchedEffect(category, categories) {
+        if (category in categories) {
+            mealViewModel.loadRecipes(category)
+        }
+    }
+
+    LaunchedEffect(
+        listState,
+        displayedRecipes.size,
+        mealViewModel.isLoadingMore,
+        mealViewModel.hasMore
+    ) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = layoutInfo.totalItemsCount
+
+            lastVisibleItem >= totalItems - 4
+        }.collect { shouldLoadMore ->
+            if (shouldLoadMore && displayedRecipes.isNotEmpty()) {
+                mealViewModel.loadNextPage()
+            }
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Кулінарна книга")
+                    Text("Recipe Book")
                 },
                 actions = {
                     TextButton(onClick = onSettingsClick) {
-                        Text("Налаштування")
+                        Text("Settings")
                     }
                 }
             )
         }
     ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
+
             CategoryRow(
                 categories = categories,
                 selectedCategory = category,
@@ -75,28 +100,43 @@ fun MainScreen(
                 }
             )
 
-            if (mealViewModel.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(
-                        Alignment.CenterHorizontally
-                    )
-                )
-            }
+            if (mealViewModel.isLoading && displayedRecipes.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    items(displayedRecipes) { recipe ->
+                        RecipeCard(
+                            recipe = recipe,
+                            onClick = {
+                                onItemClick(recipe.id)
+                            }
+                        )
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                items(displayedRecipes) { recipe ->
-                    RecipeCard(
-                        recipe = recipe,
-                        onClick = {
-                            onItemClick(recipe.id)
+                        Spacer(Modifier.height(16.dp))
+                    }
+
+                    if (mealViewModel.isLoadingMore) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
                         }
-                    )
-
-                    Spacer(Modifier.height(16.dp))
+                    }
                 }
             }
         }

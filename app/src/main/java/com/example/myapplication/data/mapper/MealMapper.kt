@@ -1,10 +1,11 @@
+
 package com.example.myapplication.data.mapper
 
-import com.example.myapplication.R
 import com.example.myapplication.data.model.Recipe
 import com.example.myapplication.data.model.MealResponse
 
 fun MealResponse.toRecipe(): Recipe {
+
     val ingredients = listOf(
         ingredient1 to measure1,
         ingredient2 to measure2,
@@ -31,18 +32,22 @@ fun MealResponse.toRecipe(): Recipe {
             ?.takeIf { it.isNotBlank() }
             ?.let { name ->
                 val amount = measure?.trim().orEmpty()
-                if (amount.isBlank()) name else "$name — $amount"
+
+                if (amount.isBlank()) name
+                else "$name — $amount"
             }
     }.joinToString("\n")
 
     return Recipe(
         id = id?.toIntOrNull() ?: 0,
         name = name.orEmpty(),
-        image = R.drawable.pizza_salami,
+        imageUrl = image.orEmpty(),
         category = category.orEmpty(),
-        difficulty = "Не вказано",
-        time = "Не вказано",
+        area = area.orEmpty(),
         ingredients = ingredients,
-        instructions = instructions.orEmpty()
+        instructions = instructions.orEmpty(),
+        tags = tags.orEmpty(),
+        youtube = youtube.orEmpty(),
+        source = source.orEmpty()
     )
 }
