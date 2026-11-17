@@ -3,8 +3,8 @@ package com.example.myapplication.ui.screens.main
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +16,8 @@ import com.example.myapplication.ui.components.CategoryRow
 import com.example.myapplication.ui.components.RecipeCard
 import com.example.myapplication.ui.viewmodel.MealViewModel
 import com.example.myapplication.ui.viewmodel.MainScreenViewModel
+import kotlinx.coroutines.launch
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,6 +25,7 @@ fun MainScreen(
     onItemClick: (Int) -> Unit,
     onSettingsClick: () -> Unit,
     mealViewModel: MealViewModel,
+    listState: LazyListState,
     viewModel: MainScreenViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -31,11 +34,7 @@ fun MainScreen(
     val categories = mealViewModel.categories
     val displayedRecipes = mealViewModel.recipes.sortedBy { it.name }
 
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(category) {
-        listState.scrollToItem(0)
-    }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         mealViewModel.loadCategories()
@@ -98,6 +97,10 @@ fun MainScreen(
                 selectedCategory = category,
                 onCategorySelected = {
                     viewModel.selectCategory(it)
+
+                    coroutineScope.launch {
+                        listState.scrollToItem(0)
+                    }
                 }
             )
 
@@ -163,7 +166,10 @@ fun MainScreen(
                             .fillMaxSize()
                             .padding(16.dp)
                     ) {
-                        items(displayedRecipes) { recipe ->
+                        items(
+                            items = displayedRecipes,
+                            key = { recipe -> recipe.id }
+                        ) { recipe ->
                             RecipeCard(
                                 recipe = recipe,
                                 onClick = {

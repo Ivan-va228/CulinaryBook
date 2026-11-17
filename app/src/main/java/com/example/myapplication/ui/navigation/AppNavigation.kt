@@ -3,6 +3,7 @@ package com.example.myapplication.ui.navigation
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -40,6 +41,7 @@ fun AppNavigation() {
 
         val mealViewModel: MealViewModel = viewModel()
         val navController = rememberNavController()
+        val listState = rememberLazyListState()
 
         NavHost(
             navController = navController,
@@ -49,6 +51,7 @@ fun AppNavigation() {
             composable("main") {
                 MainScreen(
                     mealViewModel = mealViewModel,
+                    listState = listState,
                     onSettingsClick = {
                         navController.navigate("settings")
                     },

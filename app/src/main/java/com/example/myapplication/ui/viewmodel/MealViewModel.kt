@@ -41,6 +41,7 @@ class MealViewModel : ViewModel() {
     private var mealIds = emptyList<String>()
     private var nextIndex = 0
     private var requestNumber = 0
+    private var loadedCategory: String? = null
 
     private fun getErrorMessage(e: Exception): String {
         return when (e) {
@@ -55,7 +56,7 @@ class MealViewModel : ViewModel() {
         if (categories.isEmpty()) {
             loadCategories()
         } else {
-            loadRecipes(category)
+            loadRecipes(category, force = true)
         }
     }
 
@@ -82,7 +83,12 @@ class MealViewModel : ViewModel() {
         }
     }
 
-    fun loadRecipes(category: String) {
+    fun loadRecipes(category: String, force: Boolean = false) {
+
+        if (!force && loadedCategory == category && errorMessage == null) {
+            return
+        }
+
         val currentRequest = ++requestNumber
 
         viewModelScope.launch {
@@ -105,6 +111,7 @@ class MealViewModel : ViewModel() {
                 }
 
                 mealIds = meals.map { it.id!! }
+                loadedCategory = category
 
                 if (mealIds.isNotEmpty()) {
                     loadNextBatch(currentRequest)
@@ -118,6 +125,7 @@ class MealViewModel : ViewModel() {
                 if (currentRequest == requestNumber) {
                     errorMessage = getErrorMessage(e)
                     recipes = emptyList()
+                    loadedCategory = null
                 }
             } finally {
                 if (currentRequest == requestNumber) {
