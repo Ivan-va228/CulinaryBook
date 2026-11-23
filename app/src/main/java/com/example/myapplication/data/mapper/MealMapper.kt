@@ -38,10 +38,16 @@ fun MealResponse.toRecipe(): Recipe {
             }
     }.joinToString("\n")
 
+    val imageUrl = image
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?.replace("http://", "https://")
+        ?: ""
+
     return Recipe(
         id = id?.toIntOrNull() ?: 0,
         name = name.orEmpty(),
-        imageUrl = image.orEmpty(),
+        imageUrl = imageUrl,
         category = category.orEmpty(),
         area = area.orEmpty(),
         ingredients = ingredients,

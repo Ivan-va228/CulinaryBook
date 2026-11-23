@@ -11,6 +11,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.SerializationException
 import java.io.IOException
 import retrofit2.HttpException
@@ -32,6 +34,9 @@ class MealViewModel : ViewModel() {
     var isLoadingMore by mutableStateOf(false)
         private set
 
+    var isRefreshing by mutableStateOf(false)
+        private set
+
     var hasMore by mutableStateOf(true)
         private set
 
@@ -42,6 +47,8 @@ class MealViewModel : ViewModel() {
     private var nextIndex = 0
     private var requestNumber = 0
     private var loadedCategory: String? = null
+
+    private val requestSemaphore = Semaphore(4)
 
     private fun getErrorMessage(e: Exception): String {
         return when (e) {
@@ -60,12 +67,19 @@ class MealViewModel : ViewModel() {
         }
     }
 
+    fun refreshRecipes(category: String) {
+        loadRecipes(category, force = true, refresh = true)
+    }
+
     fun loadCategories() {
         viewModelScope.launch {
             errorMessage = null
 
             try {
-                val response = MealApiService.api.getCategories()
+                val response = requestSemaphore.withPermit {
+                    MealApiService.api.getCategories()
+                }
+
                 val result = response.categories.orEmpty()
                     .mapNotNull { it.name }
 
@@ -83,8 +97,11 @@ class MealViewModel : ViewModel() {
         }
     }
 
-    fun loadRecipes(category: String, force: Boolean = false) {
-
+    fun loadRecipes(
+        category: String,
+        force: Boolean = false,
+        refresh: Boolean = false
+    ) {
         if (!force && loadedCategory == category && errorMessage == null) {
             return
         }
@@ -92,17 +109,22 @@ class MealViewModel : ViewModel() {
         val currentRequest = ++requestNumber
 
         viewModelScope.launch {
-            isLoading = true
+            isRefreshing = refresh
+            isLoading = !refresh
             isLoadingMore = false
             errorMessage = null
-            recipes = emptyList()
-            mealIds = emptyList()
-            nextIndex = 0
-            hasMore = true
+
+            if (!refresh) {
+                recipes = emptyList()
+                mealIds = emptyList()
+                nextIndex = 0
+                hasMore = true
+            }
 
             try {
-                val response =
+                val response = requestSemaphore.withPermit {
                     MealApiService.api.getMealsByCategory(category)
+                }
 
                 val meals = response.meals.orEmpty()
 
@@ -110,12 +132,18 @@ class MealViewModel : ViewModel() {
                     throw SerializationException("Invalid meal data")
                 }
 
-                mealIds = meals.map { it.id!! }
+                mealIds = if (refresh) {
+                    meals.map { it.id!! }.shuffled()
+                } else {
+                    meals.map { it.id!! }
+                }
+                nextIndex = 0
                 loadedCategory = category
 
                 if (mealIds.isNotEmpty()) {
-                    loadNextBatch(currentRequest)
+                    loadNextBatch(currentRequest, replace = refresh)
                 } else {
+                    recipes = emptyList()
                     hasMore = false
                 }
 
@@ -124,19 +152,25 @@ class MealViewModel : ViewModel() {
             } catch (e: Exception) {
                 if (currentRequest == requestNumber) {
                     errorMessage = getErrorMessage(e)
-                    recipes = emptyList()
-                    loadedCategory = null
+
+                    if (!refresh) {
+                        recipes = emptyList()
+                        loadedCategory = null
+                    }
                 }
             } finally {
                 if (currentRequest == requestNumber) {
                     isLoading = false
+                    isRefreshing = false
                 }
             }
         }
     }
 
     fun loadNextPage() {
-        if (isLoading || isLoadingMore || !hasMore) return
+        if (isLoading || isLoadingMore || isRefreshing || !hasMore || errorMessage != null) {
+            return
+        }
 
         val currentRequest = requestNumber
 
@@ -159,7 +193,10 @@ class MealViewModel : ViewModel() {
         }
     }
 
-    private suspend fun loadNextBatch(currentRequest: Int) {
+    private suspend fun loadNextBatch(
+        currentRequest: Int,
+        replace: Boolean = false
+    ) {
         val batchIds = mealIds
             .drop(nextIndex)
             .take(10)
@@ -172,18 +209,25 @@ class MealViewModel : ViewModel() {
         val newRecipes = coroutineScope {
             batchIds.map { id ->
                 async {
-                    val response = MealApiService.api.getMealById(id)
+                    requestSemaphore.withPermit {
+                        val response = MealApiService.api.getMealById(id)
 
-                    val meal = response.meals?.firstOrNull()
-                        ?: throw SerializationException("Invalid meal response")
+                        val meal = response.meals?.firstOrNull()
+                            ?: throw SerializationException("Invalid meal response")
 
-                    meal.toRecipe()
+                        meal.toRecipe()
+                    }
                 }
             }.awaitAll()
         }
 
         if (currentRequest == requestNumber) {
-            recipes = recipes + newRecipes
+            recipes = if (replace) {
+                newRecipes
+            } else {
+                recipes + newRecipes
+            }
+
             nextIndex += batchIds.size
             hasMore = nextIndex < mealIds.size
         }
@@ -195,8 +239,9 @@ class MealViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                val response =
+                val response = requestSemaphore.withPermit {
                     MealApiService.api.getMealById(id.toString())
+                }
 
                 val meal = response.meals?.firstOrNull()
                     ?: throw SerializationException("Invalid meal response")

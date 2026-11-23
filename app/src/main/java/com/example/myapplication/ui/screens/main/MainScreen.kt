@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,7 +18,6 @@ import com.example.myapplication.ui.components.RecipeCard
 import com.example.myapplication.ui.viewmodel.MealViewModel
 import com.example.myapplication.ui.viewmodel.MainScreenViewModel
 import kotlinx.coroutines.launch
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,13 +85,11 @@ fun MainScreen(
             )
         }
     ) { padding ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-
             CategoryRow(
                 categories = categories,
                 selectedCategory = category,
@@ -105,7 +103,7 @@ fun MainScreen(
             )
 
             when {
-                mealViewModel.errorMessage != null -> {
+                mealViewModel.errorMessage != null && displayedRecipes.isEmpty() -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -160,35 +158,46 @@ fun MainScreen(
                 }
 
                 else -> {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
+                    PullToRefreshBox(
+                        isRefreshing = mealViewModel.isRefreshing,
+                        onRefresh = {
+                            coroutineScope.launch {
+                                listState.scrollToItem(0)
+                                mealViewModel.refreshRecipes(category)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        items(
-                            items = displayedRecipes,
-                            key = { recipe -> recipe.id }
-                        ) { recipe ->
-                            RecipeCard(
-                                recipe = recipe,
-                                onClick = {
-                                    onItemClick(recipe.id)
-                                }
-                            )
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                        ) {
+                            items(
+                                items = displayedRecipes,
+                                key = { recipe -> recipe.id }
+                            ) { recipe ->
+                                RecipeCard(
+                                    recipe = recipe,
+                                    onClick = {
+                                        onItemClick(recipe.id)
+                                    }
+                                )
 
-                            Spacer(Modifier.height(16.dp))
-                        }
+                                Spacer(Modifier.height(16.dp))
+                            }
 
-                        if (mealViewModel.isLoadingMore) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator()
+                            if (mealViewModel.isLoadingMore) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
                                 }
                             }
                         }
