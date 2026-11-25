@@ -18,6 +18,20 @@ class MainScreenViewModel : ViewModel() {
         )
     }
 
+    fun updateSearchQuery(query: String) {
+        _state.value = _state.value.copy(
+            searchQuery = query,
+            error = null
+        )
+    }
+
+    fun clearSearch() {
+        _state.value = _state.value.copy(
+            searchQuery = "",
+            error = null
+        )
+    }
+
     fun showError(message: String) {
         _state.value = _state.value.copy(
             error = message

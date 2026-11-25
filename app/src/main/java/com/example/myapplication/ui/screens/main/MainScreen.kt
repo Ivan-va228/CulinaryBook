@@ -17,6 +17,7 @@ import com.example.myapplication.ui.components.CategoryRow
 import com.example.myapplication.ui.components.RecipeCard
 import com.example.myapplication.ui.viewmodel.MealViewModel
 import com.example.myapplication.ui.viewmodel.MainScreenViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,10 +31,11 @@ fun MainScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val category = state.category
+    val searchQuery = state.searchQuery
+    val isSearching = searchQuery.isNotBlank()
 
     val categories = mealViewModel.categories
     val displayedRecipes = mealViewModel.recipes.sortedBy { it.name }
-
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -46,9 +48,17 @@ fun MainScreen(
         }
     }
 
-    LaunchedEffect(category, categories) {
+    LaunchedEffect(category, categories, searchQuery) {
         if (category in categories) {
-            mealViewModel.loadRecipes(category)
+            if (searchQuery.isNotBlank()) {
+                delay(500)
+            }
+
+            mealViewModel.loadRecipes(
+                category = category,
+                searchQuery = searchQuery,
+                force = true
+            )
         }
     }
 
@@ -56,7 +66,8 @@ fun MainScreen(
         listState,
         displayedRecipes.size,
         mealViewModel.isLoadingMore,
-        mealViewModel.hasMore
+        mealViewModel.hasMore,
+        searchQuery
     ) {
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
@@ -65,7 +76,10 @@ fun MainScreen(
 
             lastVisibleItem >= totalItems - 4
         }.collect { shouldLoadMore ->
-            if (shouldLoadMore && displayedRecipes.isNotEmpty()) {
+            if (!isSearching &&
+                shouldLoadMore &&
+                displayedRecipes.isNotEmpty()
+            ) {
                 mealViewModel.loadNextPage()
             }
         }
@@ -85,25 +99,62 @@ fun MainScreen(
             )
         }
     ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            CategoryRow(
-                categories = categories,
-                selectedCategory = category,
-                onCategorySelected = {
-                    viewModel.selectCategory(it)
 
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = {
+                    viewModel.updateSearchQuery(it)
                     coroutineScope.launch {
                         listState.scrollToItem(0)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                label = {
+                    Text("Search recipes")
+                },
+                singleLine = true,
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                viewModel.clearSearch()
+                                coroutineScope.launch {
+                                    listState.scrollToItem(0)
+                                }
+                            }
+                        ) {
+                            Text("Clear")
+                        }
                     }
                 }
             )
 
+            if (!isSearching) {
+                CategoryRow(
+                    categories = categories,
+                    selectedCategory = category,
+                    onCategorySelected = {
+                        viewModel.selectCategory(it)
+
+                        coroutineScope.launch {
+                            listState.scrollToItem(0)
+                        }
+                    }
+                )
+            }
+
             when {
-                mealViewModel.errorMessage != null && displayedRecipes.isEmpty() -> {
+                mealViewModel.errorMessage != null &&
+                        displayedRecipes.isEmpty() -> {
+
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -113,15 +164,16 @@ fun MainScreen(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = mealViewModel.errorMessage!!
-                            )
+                            Text(mealViewModel.errorMessage!!)
 
                             Spacer(Modifier.height(16.dp))
 
                             Button(
                                 onClick = {
-                                    mealViewModel.retry(category)
+                                    mealViewModel.retry(
+                                        category,
+                                        searchQuery
+                                    )
                                 }
                             ) {
                                 Text("Try again")
@@ -150,24 +202,39 @@ fun MainScreen(
 
                 displayedRecipes.isEmpty() -> {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No recipes found in this category.")
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                if (isSearching) {
+                                    "No recipes found for \"$searchQuery\"."
+                                } else {
+                                    "No recipes found in this category."
+                                }
+                            )
+
+                            if (isSearching) {
+                                Spacer(Modifier.height(16.dp))
+
+                                Button(
+                                    onClick = {
+                                        viewModel.clearSearch()
+                                    }
+                                ) {
+                                    Text("Clear search")
+                                }
+                            }
+                        }
                     }
                 }
 
                 else -> {
-                    PullToRefreshBox(
-                        isRefreshing = mealViewModel.isRefreshing,
-                        onRefresh = {
-                            coroutineScope.launch {
-                                listState.scrollToItem(0)
-                                mealViewModel.refreshRecipes(category)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    ) {
+                    val recipeList: @Composable () -> Unit = {
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
@@ -200,6 +267,23 @@ fun MainScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    if (isSearching) {
+                        recipeList()
+                    } else {
+                        PullToRefreshBox(
+                            isRefreshing = mealViewModel.isRefreshing,
+                            onRefresh = {
+                                coroutineScope.launch {
+                                    listState.scrollToItem(0)
+                                    mealViewModel.refreshRecipes(category)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            recipeList()
                         }
                     }
                 }

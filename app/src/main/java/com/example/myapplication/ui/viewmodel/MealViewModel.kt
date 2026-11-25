@@ -11,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.SerializationException
@@ -47,6 +48,9 @@ class MealViewModel : ViewModel() {
     private var nextIndex = 0
     private var requestNumber = 0
     private var loadedCategory: String? = null
+    private var loadedQuery = ""
+
+    private var loadJob: Job? = null
 
     private val requestSemaphore = Semaphore(4)
 
@@ -59,11 +63,11 @@ class MealViewModel : ViewModel() {
         }
     }
 
-    fun retry(category: String) {
+    fun retry(category: String, searchQuery: String = "") {
         if (categories.isEmpty()) {
             loadCategories()
         } else {
-            loadRecipes(category, force = true)
+            loadRecipes(category, searchQuery, force = true)
         }
     }
 
@@ -99,16 +103,26 @@ class MealViewModel : ViewModel() {
 
     fun loadRecipes(
         category: String,
+        searchQuery: String = "",
         force: Boolean = false,
         refresh: Boolean = false
     ) {
-        if (!force && loadedCategory == category && errorMessage == null) {
+        val query = searchQuery.trim()
+
+        if (!force &&
+            loadedCategory == category &&
+            loadedQuery == query &&
+            errorMessage == null
+        ) {
             return
         }
 
         val currentRequest = ++requestNumber
 
-        viewModelScope.launch {
+        // Скасовуємо попереднє завантаження
+        loadJob?.cancel()
+
+        loadJob = viewModelScope.launch {
             isRefreshing = refresh
             isLoading = !refresh
             isLoadingMore = false
@@ -122,29 +136,47 @@ class MealViewModel : ViewModel() {
             }
 
             try {
-                val response = requestSemaphore.withPermit {
-                    MealApiService.api.getMealsByCategory(category)
-                }
+                if (query.isNotEmpty()) {
+                    val response = requestSemaphore.withPermit {
+                        MealApiService.api.searchMeals(query)
+                    }
 
-                val meals = response.meals.orEmpty()
+                    if (currentRequest == requestNumber) {
+                        recipes = response.meals.orEmpty().map { it.toRecipe() }
+                        mealIds = emptyList()
+                        nextIndex = 0
+                        hasMore = false
+                        loadedCategory = category
+                        loadedQuery = query
+                    }
 
-                if (meals.any { it.id.isNullOrBlank() }) {
-                    throw SerializationException("Invalid meal data")
-                }
-
-                mealIds = if (refresh) {
-                    meals.map { it.id!! }.shuffled()
                 } else {
-                    meals.map { it.id!! }
-                }
-                nextIndex = 0
-                loadedCategory = category
+                    val response = requestSemaphore.withPermit {
+                        MealApiService.api.getMealsByCategory(category)
+                    }
 
-                if (mealIds.isNotEmpty()) {
-                    loadNextBatch(currentRequest, replace = refresh)
-                } else {
-                    recipes = emptyList()
-                    hasMore = false
+                    val meals = response.meals.orEmpty()
+
+                    if (meals.any { it.id.isNullOrBlank() }) {
+                        throw SerializationException("Invalid meal data")
+                    }
+
+                    mealIds = if (refresh) {
+                        meals.map { it.id!! }.shuffled()
+                    } else {
+                        meals.map { it.id!! }
+                    }
+
+                    nextIndex = 0
+                    loadedCategory = category
+                    loadedQuery = ""
+
+                    if (mealIds.isNotEmpty()) {
+                        loadNextBatch(currentRequest, replace = refresh)
+                    } else {
+                        recipes = emptyList()
+                        hasMore = false
+                    }
                 }
 
             } catch (e: CancellationException) {
@@ -156,6 +188,7 @@ class MealViewModel : ViewModel() {
                     if (!refresh) {
                         recipes = emptyList()
                         loadedCategory = null
+                        loadedQuery = ""
                     }
                 }
             } finally {
